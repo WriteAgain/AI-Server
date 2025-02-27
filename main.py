@@ -38,7 +38,7 @@ def generate_response(latest_posts, new_post, prompt: str) -> str:
     return response.choices[0].message.content
 
 # AI 서버 엔드포인트: OpenAI를 호출하여 새 글 응답 생성
-@app.post("/users/{userId}/articles")
+@app.post("/{userId}/articles")
 async def generate_text(userId: str):
     pdf_path = "prompt.pdf"
     if not os.path.exists(pdf_path):
@@ -48,7 +48,7 @@ async def generate_text(userId: str):
     prompt_text = read_prompt_from_pdf(pdf_path)
 
     # 백엔드에서 최신 블로그 글 가져오기 (POST 방식)
-    latest_posts_url = f"{BACKEND_SERVER}/users/{userId}/articles"
+    latest_posts_url = f"{BACKEND_SERVER}/{userId}/users/articles"
     latest_posts_response = requests.post(latest_posts_url, json={"userId": userId})
 
     if latest_posts_response.status_code != 200:
@@ -57,7 +57,7 @@ async def generate_text(userId: str):
     latest_posts = latest_posts_response.json()
 
     # 백엔드에서 새 글 데이터 가져오기 (POST 방식)
-    new_post_url = f"{BACKEND_SERVER}/users/{userId}/articles"
+    new_post_url = f"{BACKEND_SERVER}/{userId}/articles"
     new_post_response = requests.post(new_post_url, json={"userId": userId})
 
     if new_post_response.status_code != 200:
@@ -73,7 +73,7 @@ async def generate_text(userId: str):
     response_text = generate_response(latest_posts, new_post, prompt_text)
 
     # 제목과 생성된 응답을 백엔드에 저장 
-    save_response_url = f"{BACKEND_SERVER}/users/{userId}/articles"
+    save_response_url = f"{BACKEND_SERVER}/{userId}/articles"
     save_payload = {
         "title": new_post["title"],
         "content": response_text
@@ -87,3 +87,7 @@ async def generate_text(userId: str):
         "title": new_post["title"],
         "content": response_text
     }
+
+
+# 터미널 실행 -> FastAPI 서버 실행
+# uvicorn main:app --host 0.0.0.0 --port 8000
