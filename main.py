@@ -27,18 +27,18 @@ def generate_response(latest_posts, new_post, prompt: str) -> str:
     messages = [
         {"role": "system", "content": prompt},
         {"role": "user", "content": f"최근 작성된 글들: {latest_posts}"},
-        {"role": "user", "content": f"새롭게 작성하려는 제목: {new_post['title']}"}
+        {"role": "user", "content": f"새롭게 작성하려는 제목: {new_post['title']}, 메모: {new_post['memo']}"}
     ]
-
-    response = openai.ChatCompletion.create(
+    client = openai.OpenAI()
+    response = client.chat.completions.create(
         model="gpt-4o-mini",
         messages=messages
     )
 
-    return response["choices"][0]["message"]["content"]
+    return response.choices[0].message.content
 
 # AI 서버 엔드포인트: OpenAI를 호출하여 새 글 응답 생성
-@app.get("/{userId}/generate")
+@app.post("/users/{userId}/articles")
 async def generate_text(userId: str):
     pdf_path = "prompt.pdf"
     if not os.path.exists(pdf_path):
@@ -47,36 +47,43 @@ async def generate_text(userId: str):
     # PDF에서 프롬프트 읽기
     prompt_text = read_prompt_from_pdf(pdf_path)
 
-    # 백엔드에서 이전 글 가져오기
-    latest_posts_url = f"{BACKEND_SERVER}/{userId}/user/article"
-    latest_posts_response = requests.get(latest_posts_url)
+    # 백엔드에서 최신 블로그 글 가져오기 (POST 방식)
+    latest_posts_url = f"{BACKEND_SERVER}/users/{userId}/articles"
+    latest_posts_response = requests.post(latest_posts_url, json={"userId": userId})
 
     if latest_posts_response.status_code != 200:
-        raise HTTPException(status_code=500, detail="이전 글 데이터를 가져오는 중 오류 발생")
+        raise HTTPException(status_code=500, detail="최신 블로그 글 데이터를 가져오는 중 오류 발생")
 
     latest_posts = latest_posts_response.json()
 
-    # 백엔드에서 새 글 데이터 가져오기
-    new_post_url = f"{BACKEND_SERVER}/{userId}/articles"
-    new_post_response = requests.get(new_post_url)
+    # 백엔드에서 새 글 데이터 가져오기 (POST 방식)
+    new_post_url = f"{BACKEND_SERVER}/users/{userId}/articles"
+    new_post_response = requests.post(new_post_url, json={"userId": userId})
 
     if new_post_response.status_code != 200:
         raise HTTPException(status_code=500, detail="새 글 데이터를 가져오는 중 오류 발생")
 
     new_post = new_post_response.json()
 
+    # 🔹 데이터가 모두 존재하는지 확인 (하나라도 없으면 오류 반환)
+    if not latest_posts or not new_post or "title" not in new_post or "memo" not in new_post:
+        raise HTTPException(status_code=400, detail="필수 데이터가 부족하여 응답을 생성할 수 없습니다.")
+
     # OpenAI에 요청하여 응답 생성
     response_text = generate_response(latest_posts, new_post, prompt_text)
 
-    # 생성된 응답을 백엔드에 저장 (제목, 응답)
-    save_response_url = f"{BACKEND_SERVER}/{userId}/articles"
+    # 제목과 생성된 응답을 백엔드에 저장 
+    save_response_url = f"{BACKEND_SERVER}/users/{userId}/articles"
     save_payload = {
         "title": new_post["title"],
-        "generated_response": response_text
+        "content": response_text
     }
     save_response = requests.post(save_response_url, json=save_payload)
 
     if save_response.status_code != 200:
         raise HTTPException(status_code=500, detail="생성된 응답을 저장하는 중 오류 발생")
 
-    return {"response": response_text}
+    return {
+        "title": new_post["title"],
+        "content": response_text
+    }
