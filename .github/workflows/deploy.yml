@@ -23,13 +23,13 @@ jobs:
 
       - name: Deploy to Compute Engine
         run: |
-          gcloud compute ssh instance-20250227-065113 --zone=asia-northeast3-c --command="
+          gcloud compute ssh ai --zone=asia-northeast3-a --command="
             cd AI-Server || git clone https://github.com/WriteAgain/AI-Server.git && cd AI-Server
             git pull origin main
             sudo apt-get update
             sudo apt-get install -y python3 python3-pip
             pip3 install -r requirements.txt
-            export BACKEND_SERVER=\"34.64.248.152\"
+            export BACKEND_SERVER=\"http://34.64.225.114\"
             export OPENAI_API_KEY=\"\$(gcloud secrets versions access latest --secret=openai-api-key)\"
             nohup python main.py > app.log 2>&1 &
           "
