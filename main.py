@@ -91,3 +91,5 @@ async def generate_text(userId: str):
 
 # 터미널 실행 -> FastAPI 서버 실행
 # uvicorn main:app --host 0.0.0.0 --port 8000
+# 관리자 모드로 실행
+# fastapi dev main.py
